@@ -48,8 +48,10 @@
         .clock-container {
             position: relative;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+            gap: 3vmin;
         }
 
         .clock {
@@ -80,6 +82,29 @@
         }
         
         body.light-mode .digital-clock {
+            color: var(--text-light);
+        }
+
+        .date-display {
+            padding: 0.9em 1.4em;
+            border-radius: 999px;
+            background: var(--btn-bg-dark);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: var(--text-dark);
+            font-size: clamp(14px, 2.6vmin, 24px);
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            line-height: 1.2;
+            text-align: center;
+            transition: color 0.5s, background-color 0.5s, border-color 0.5s;
+        }
+
+        body.light-mode .date-display {
+            background: var(--btn-bg-light);
+            border: 1px solid rgba(0, 0, 0, 0.05);
             color: var(--text-light);
         }
 
@@ -244,6 +269,7 @@
             <div class="hand second-hand"></div>
         </div>
         <div class="clock digital-clock"></div>
+        <div class="date-display" aria-live="polite"></div>
     </div>
 
     <div class="controls">
@@ -272,6 +298,7 @@
          */
         const digitalClock = document.querySelector('.digital-clock');
         const analogClock = document.querySelector('.analog-clock');
+        const dateDisplay = document.querySelector('.date-display');
         const hourHand = document.querySelector('.hour-hand');
         const minuteHand = document.querySelector('.minute-hand');
         const secondHand = document.querySelector('.second-hand');
@@ -281,6 +308,13 @@
         const toggleModeBtn = document.getElementById('toggleModeBtn');
         const aboutBtn = document.getElementById('aboutBtn');
         const aboutModal = document.getElementById('aboutModal');
+
+        const dateFormatter = new Intl.DateTimeFormat(navigator.language, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
 
         let isAnalog = true;
 
@@ -308,6 +342,7 @@
             hourHand.style.transform = `rotate(${hoursDegrees}deg)`;
 
             digitalClock.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            dateDisplay.textContent = dateFormatter.format(now);
         }
 
         function toggleClocks() {
