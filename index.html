@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegant Clock</title>
+    <style>
+        /*
+         * Copyright (c) 2025 Hang Wong
+         * SPDX-License-Identifier: AGPL-3.0-or-later
+         */
+        :root {
+            --bg-dark: #1C2533;
+            --face-dark: #2C3E50;
+            --text-dark: #EAEAEA;
+            --hand-dark: #EAEAEA;
+            --second-hand-dark: #FF4B5C;
+            --pivot-dark: #FF4B5C;
+            --btn-bg-dark: rgba(255, 255, 255, 0.1);
+            --btn-icon-dark: #FFFFFF;
+
+            --bg-light: #F0F0F0;
+            --face-light: #FFFFFF;
+            --text-light: #222222;
+            --hand-light: #222222;
+            --second-hand-light: #FF0000;
+            --pivot-light: #FF0000;
+            --btn-bg-light: rgba(0, 0, 0, 0.08);
+            --btn-icon-light: #333333;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            transition: background-color 0.5s;
+            background-color: var(--bg-dark);
+            overflow: hidden;
+        }
+
+        body.light-mode {
+            background-color: var(--bg-light);
+        }
+
+        .clock-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .clock {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .analog-clock {
+            width: 80vmin;
+            height: 80vmin;
+            background-color: var(--face-dark);
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            transition: background-color 0.5s;
+        }
+        
+        body.light-mode .analog-clock {
+            background-color: var(--face-light);
+        }
+        
+        .digital-clock {
+            font-size: 25vmin;
+            font-weight: 600;
+            display: none;
+            color: var(--text-dark);
+        }
+        
+        body.light-mode .digital-clock {
+            color: var(--text-light);
+        }
+
+        .analog-clock::after {
+            content: '';
+            position: absolute;
+            width: 2.5vmin;
+            height: 2.5vmin;
+            background: var(--pivot-dark);
+            border-radius: 50%;
+            z-index: 11;
+        }
+
+        body.light-mode .analog-clock::after {
+            background: var(--pivot-light);
+        }
+
+        .number {
+            position: absolute;
+            font-size: 7vmin;
+            font-weight: 500;
+            color: var(--text-dark);
+            transform: translate(-50%, -50%);
+            transition: color 0.5s;
+        }
+        
+        body.light-mode .number {
+            color: var(--text-light);
+        }
+        
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            transform-origin: bottom;
+            border-radius: 10px;
+        }
+
+        .hour-hand, .minute-hand {
+            background: var(--hand-dark);
+            transition: background 0.5s;
+        }
+        .hour-hand { width: 1.8vmin; height: 25%; z-index: 8; }
+        .minute-hand { width: 1.4vmin; height: 35%; z-index: 9; }
+        
+        body.light-mode .hour-hand,
+        body.light-mode .minute-hand { background: var(--hand-light); }
+
+        .second-hand {
+            width: 0.5vmin; height: 40%;
+            background: var(--second-hand-dark);
+            z-index: 10;
+        }
+        body.light-mode .second-hand { background: var(--second-hand-light); }
+
+        .controls {
+            position: fixed;
+            top: 50%;
+            right: 3vw;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 100;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.4s ease-in-out, visibility 0.4s ease-in-out;
+        }
+        
+        .controls.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        button {
+            width: 50px;
+            height: 50px;
+            background: var(--btn-bg-dark);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: transform 0.2s ease, background-color 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+        }
+
+        body.light-mode button {
+            background: var(--btn-bg-light);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        button svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--btn-icon-dark);
+            transition: fill 0.3s;
+        }
+        
+        body.light-mode button svg {
+            fill: var(--btn-icon-light);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 200;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal-content {
+            background: var(--face-dark);
+            color: var(--text-dark);
+            padding: 25px 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        body.light-mode .modal-content {
+            background: var(--face-light);
+            color: var(--text-light);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+        }
+
+        .modal-content a {
+            color: var(--second-hand-dark);
+        }
+
+        body.light-mode .modal-content a {
+            color: var(--second-hand-light);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="clock-container">
+        <div class="clock analog-clock">
+            <div class="hand hour-hand"></div>
+            <div class="hand minute-hand"></div>
+            <div class="hand second-hand"></div>
+        </div>
+        <div class="clock digital-clock"></div>
+    </div>
+
+    <div class="controls">
+        <button id="toggleClockBtn" title="Toggle Clock"></button>
+        <button id="fullscreenBtn" title="Toggle Fullscreen"></button>
+        <button id="toggleModeBtn" title="Toggle Theme"></button>
+        <button id="aboutBtn" title="About"></button>
+    </div>
+
+    <div id="aboutModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Elegant Clock</h2>
+            <p>Created by <strong>Hang Wong</strong></p>
+            <p>
+                This software is open-source, licensed under the 
+                <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPLv3</a>.
+            </p>
+        </div>
+    </div>
+
+
+    <script>
+        /*
+         * Copyright (c) 2025 Hang Wong
+         * SPDX-License-Identifier: AGPL-3.0-or-later
+         */
+        const digitalClock = document.querySelector('.digital-clock');
+        const analogClock = document.querySelector('.analog-clock');
+        const hourHand = document.querySelector('.hour-hand');
+        const minuteHand = document.querySelector('.minute-hand');
+        const secondHand = document.querySelector('.second-hand');
+        const controls = document.querySelector('.controls');
+        const toggleClockBtn = document.getElementById('toggleClockBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const toggleModeBtn = document.getElementById('toggleModeBtn');
+        const aboutBtn = document.getElementById('aboutBtn');
+        const aboutModal = document.getElementById('aboutModal');
+
+        let isAnalog = true;
+
+        const icons = {
+            analog: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path></svg>`,
+            digital: `<svg viewBox="0 0 24 24"><path d="M7 10h2v4H7zm4 0h2v4h-2zm4 0h2v4h-2z"></path><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path></svg>`,
+            fullscreenEnter: `<svg viewBox="0 0 24 24"><path d="M5 5h5V3H3v7h2zm5 14H5v-5H3v7h7zm9-14h-5V3h7v7h-2zm-5 14h5v-5h2v7h-7z"></path></svg>`,
+            fullscreenExit: `<svg viewBox="0 0 24 24"><path d="M3 9h2V5h4V3H3zm16 0h2V5h-4V3h6v6zM9 21h2v-4h4v-2H9zm12-6h-2v4h-4v2h6z"></path></svg>`,
+            sun: `<svg viewBox="0 0 24 24"><path d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10S2 17.514 2 12 6.486 2 12 2zM4 12c0 1.846.634 3.543 1.688 4.898l8.414-8.414A7.962 7.962 0 0 0 12 4c-4.411 0-8 3.589-8 8zm8 8c1.846 0 3.543-.634 4.898-1.688l-8.414-8.414A7.962 7.962 0 0 0 4 12c0 4.411 3.589 8 8 8z"></path></svg>`,
+            moon: `<svg viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-18A10 10 0 1 0 22 12 10 10 0 0 0 12 2z"></path></svg>`,
+            info: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M11 11h2v6h-2zm0-4h2v2h-2z"></path></svg>`
+        };
+        
+        function setDate() {
+            const now = new Date();
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes();
+            const hours = now.getHours();
+
+            const secondsDegrees = (seconds / 60) * 360;
+            secondHand.style.transform = `rotate(${secondsDegrees}deg)`;
+            const minutesDegrees = (minutes / 60) * 360 + (seconds/60)*6;
+            minuteHand.style.transform = `rotate(${minutesDegrees}deg)`;
+            const hoursDegrees = (hours / 12) * 360 + (minutes/60)*30;
+            hourHand.style.transform = `rotate(${hoursDegrees}deg)`;
+
+            digitalClock.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function toggleClocks() {
+            isAnalog = !isAnalog;
+            analogClock.style.display = isAnalog ? 'flex' : 'none';
+            digitalClock.style.display = isAnalog ? 'none' : 'flex';
+            toggleClockBtn.innerHTML = isAnalog ? icons.digital : icons.analog;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Could not enter full-screen mode: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+        
+        function handleFullscreenChange() {
+            const isFullscreen = !!document.fullscreenElement;
+            controls.classList.toggle('hidden', isFullscreen);
+            fullscreenBtn.innerHTML = isFullscreen ? icons.fullscreenExit : icons.fullscreenEnter;
+        }
+
+        function toggleMode() {
+            document.body.classList.toggle('light-mode');
+            const isLightMode = document.body.classList.contains('light-mode');
+            toggleModeBtn.innerHTML = isLightMode ? icons.moon : icons.sun;
+        }
+
+        function createClockFace() {
+            const radius = 42; 
+            for (let i = 1; i <= 12; i++) {
+                const angle = i * 30 * (Math.PI / 180);
+                const number = document.createElement('div');
+                number.className = 'number';
+                number.textContent = i;
+                number.style.left = `${50 + radius * Math.sin(angle)}%`;
+                number.style.top = `${50 - radius * Math.cos(angle)}%`;
+                analogClock.appendChild(number);
+            }
+        }
+
+        function init() {
+            createClockFace();
+            setInterval(setDate, 1000);
+            setDate();
+            
+            toggleClockBtn.innerHTML = icons.digital;
+            fullscreenBtn.innerHTML = icons.fullscreenEnter;
+            toggleModeBtn.innerHTML = icons.sun;
+            aboutBtn.innerHTML = icons.info;
+
+            analogClock.style.display = 'flex';
+            digitalClock.style.display = 'none';
+
+            toggleClockBtn.addEventListener('click', toggleClocks);
+            fullscreenBtn.addEventListener('click', toggleFullscreen);
+            toggleModeBtn.addEventListener('click', toggleMode);
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            aboutBtn.addEventListener('click', () => { aboutModal.style.display = 'flex'; });
+            aboutModal.addEventListener('click', (e) => {
+                if (e.target === aboutModal) {
+                    aboutModal.style.display = 'none';
+                }
+            });
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
