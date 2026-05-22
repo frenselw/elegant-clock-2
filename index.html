@@ -140,30 +140,6 @@
         body.light-mode .number {
             color: var(--text-light);
         }
-
-        .tick-mark {
-            position: absolute;
-            width: 0.3vmin;
-            height: 1.5vmin;
-            background: var(--text-dark);
-            transform-origin: center 40vmin;
-            top: 50%;
-            left: 50%;
-            margin-left: -0.15vmin;
-            margin-top: -40vmin;
-            transition: background 0.5s;
-            z-index: 1;
-        }
-
-        .tick-mark.major {
-            width: 0.5vmin;
-            height: 2.5vmin;
-            margin-left: -0.25vmin;
-        }
-
-        body.light-mode .tick-mark {
-            background: var(--text-light);
-        }
         
         .hand {
             position: absolute;
@@ -492,15 +468,6 @@
         }
 
         function createClockFace() {
-            // Create 60 tick marks around the clock face
-            for (let i = 0; i < 60; i++) {
-                const tick = document.createElement('div');
-                tick.className = 'tick-mark' + (i % 5 === 0 ? ' major' : '');
-                tick.style.transform = `rotate(${i * 6}deg)`;
-                analogClock.appendChild(tick);
-            }
-
-            // Create hour numbers
             const radius = 42; 
             for (let i = 1; i <= 12; i++) {
                 const angle = i * 30 * (Math.PI / 180);
