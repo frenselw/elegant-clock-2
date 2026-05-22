@@ -274,6 +274,7 @@
 
     <div class="controls">
         <button id="toggleClockBtn" title="Toggle Clock"></button>
+        <button id="toggleDateBtn" title="Hide Date"></button>
         <button id="fullscreenBtn" title="Toggle Fullscreen"></button>
         <button id="toggleModeBtn" title="Toggle Theme"></button>
         <button id="aboutBtn" title="About"></button>
@@ -304,6 +305,7 @@
         const secondHand = document.querySelector('.second-hand');
         const controls = document.querySelector('.controls');
         const toggleClockBtn = document.getElementById('toggleClockBtn');
+        const toggleDateBtn = document.getElementById('toggleDateBtn');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const toggleModeBtn = document.getElementById('toggleModeBtn');
         const aboutBtn = document.getElementById('aboutBtn');
@@ -317,10 +319,13 @@
         });
 
         let isAnalog = true;
+        let isDateVisible = true;
 
         const icons = {
             analog: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path></svg>`,
             digital: `<svg viewBox="0 0 24 24"><path d="M7 10h2v4H7zm4 0h2v4h-2zm4 0h2v4h-2z"></path><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path></svg>`,
+            dateVisible: `<svg viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3zm11 8H6v10h12V10zm0-4H6v2h12V6z"></path></svg>`,
+            dateHidden: `<svg viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3zm11 8H6v10h12V10zm0-4H6v2h12V6z"></path><path d="M5.707 4.293 19.707 18.293l-1.414 1.414-14-14z"></path></svg>`,
             fullscreenEnter: `<svg viewBox="0 0 24 24"><path d="M5 5h5V3H3v7h2zm5 14H5v-5H3v7h7zm9-14h-5V3h7v7h-2zm-5 14h5v-5h2v7h-7z"></path></svg>`,
             fullscreenExit: `<svg viewBox="0 0 24 24"><path d="M3 9h2V5h4V3H3zm16 0h2V5h-4V3h6v6zM9 21h2v-4h4v-2H9zm12-6h-2v4h-4v2h6z"></path></svg>`,
             sun: `<svg viewBox="0 0 24 24"><path d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10S2 17.514 2 12 6.486 2 12 2zM4 12c0 1.846.634 3.543 1.688 4.898l8.414-8.414A7.962 7.962 0 0 0 12 4c-4.411 0-8 3.589-8 8zm8 8c1.846 0 3.543-.634 4.898-1.688l-8.414-8.414A7.962 7.962 0 0 0 4 12c0 4.411 3.589 8 8 8z"></path></svg>`,
@@ -350,6 +355,18 @@
             analogClock.style.display = isAnalog ? 'flex' : 'none';
             digitalClock.style.display = isAnalog ? 'none' : 'flex';
             toggleClockBtn.innerHTML = isAnalog ? icons.digital : icons.analog;
+        }
+
+        function updateDateVisibilityButton() {
+            toggleDateBtn.innerHTML = isDateVisible ? icons.dateVisible : icons.dateHidden;
+            toggleDateBtn.title = isDateVisible ? 'Hide Date' : 'Show Date';
+            toggleDateBtn.setAttribute('aria-label', toggleDateBtn.title);
+        }
+
+        function toggleDateVisibility() {
+            isDateVisible = !isDateVisible;
+            dateDisplay.hidden = !isDateVisible;
+            updateDateVisibilityButton();
         }
 
         function toggleFullscreen() {
@@ -393,6 +410,7 @@
             setDate();
             
             toggleClockBtn.innerHTML = icons.digital;
+            updateDateVisibilityButton();
             fullscreenBtn.innerHTML = icons.fullscreenEnter;
             toggleModeBtn.innerHTML = icons.sun;
             aboutBtn.innerHTML = icons.info;
@@ -401,6 +419,7 @@
             digitalClock.style.display = 'none';
 
             toggleClockBtn.addEventListener('click', toggleClocks);
+            toggleDateBtn.addEventListener('click', toggleDateVisibility);
             fullscreenBtn.addEventListener('click', toggleFullscreen);
             toggleModeBtn.addEventListener('click', toggleMode);
             document.addEventListener('fullscreenchange', handleFullscreenChange);
