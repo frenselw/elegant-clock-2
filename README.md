@@ -11,6 +11,7 @@ A minimalist and feature-rich clock for your web browser, built with pure HTML, 
 ### Core Features
 
 * Analog and Digital Modes
+* 12-hour and 24-hour Digital Time Toggle with Saved Preference
 * Optional Date Display
 * Light & Dark Themes
 * Full-Screen Mode
