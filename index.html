@@ -208,9 +208,22 @@
             fill: var(--btn-icon-dark);
             transition: fill 0.3s;
         }
+
+        .format-toggle-btn {
+            color: var(--btn-icon-dark);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            transition: color 0.3s, background-color 0.3s, transform 0.2s ease;
+        }
         
         body.light-mode button svg {
             fill: var(--btn-icon-light);
+        }
+
+        body.light-mode .format-toggle-btn {
+            color: var(--btn-icon-light);
         }
 
         .modal-overlay {
@@ -274,6 +287,7 @@
 
     <div class="controls">
         <button id="toggleClockBtn" title="Toggle Clock"></button>
+        <button id="toggleFormatBtn" class="format-toggle-btn" type="button"></button>
         <button id="toggleDateBtn" title="Hide Date"></button>
         <button id="fullscreenBtn" title="Toggle Fullscreen"></button>
         <button id="toggleModeBtn" title="Toggle Theme"></button>
@@ -305,11 +319,13 @@
         const secondHand = document.querySelector('.second-hand');
         const controls = document.querySelector('.controls');
         const toggleClockBtn = document.getElementById('toggleClockBtn');
+        const toggleFormatBtn = document.getElementById('toggleFormatBtn');
         const toggleDateBtn = document.getElementById('toggleDateBtn');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const toggleModeBtn = document.getElementById('toggleModeBtn');
         const aboutBtn = document.getElementById('aboutBtn');
         const aboutModal = document.getElementById('aboutModal');
+        const timeFormatStorageKey = 'elegant-clock-time-format';
 
         const dateFormatter = new Intl.DateTimeFormat(navigator.language, {
             weekday: 'short',
@@ -320,6 +336,7 @@
 
         let isAnalog = true;
         let isDateVisible = true;
+        let is24Hour = loadTimeFormatPreference();
 
         const icons = {
             analog: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path></svg>`,
@@ -332,6 +349,51 @@
             moon: `<svg viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-18A10 10 0 1 0 22 12 10 10 0 0 0 12 2z"></path></svg>`,
             info: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M11 11h2v6h-2zm0-4h2v2h-2z"></path></svg>`
         };
+
+        function loadTimeFormatPreference() {
+            try {
+                return localStorage.getItem(timeFormatStorageKey) !== '12';
+            } catch {
+                return true;
+            }
+        }
+
+        function saveTimeFormatPreference() {
+            try {
+                localStorage.setItem(timeFormatStorageKey, is24Hour ? '24' : '12');
+            } catch {
+                // Ignore storage failures and fall back to in-memory state.
+            }
+        }
+
+        function formatDigitalTime(now) {
+            if (is24Hour) {
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                return `${hours}:${minutes}:${seconds}`;
+            }
+
+            return now.toLocaleTimeString(navigator.language, {
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
+        function updateTimeFormatButton() {
+            const currentLabel = is24Hour ? '24H' : '12H';
+            const nextLabel = is24Hour ? '12-hour' : '24-hour';
+
+            toggleFormatBtn.textContent = currentLabel;
+            toggleFormatBtn.title = `Switch digital clock to ${nextLabel} format`;
+            toggleFormatBtn.setAttribute(
+                'aria-label',
+                `Digital clock is using ${is24Hour ? '24-hour' : '12-hour'} time. Activate to switch to ${nextLabel} format.`
+            );
+            toggleFormatBtn.setAttribute('aria-pressed', String(is24Hour));
+        }
         
         function setDate() {
             const now = new Date();
@@ -346,7 +408,7 @@
             const hoursDegrees = (hours / 12) * 360 + (minutes/60)*30;
             hourHand.style.transform = `rotate(${hoursDegrees}deg)`;
 
-            digitalClock.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            digitalClock.textContent = formatDigitalTime(now);
             dateDisplay.textContent = dateFormatter.format(now);
         }
 
@@ -367,6 +429,13 @@
             isDateVisible = !isDateVisible;
             dateDisplay.hidden = !isDateVisible;
             updateDateVisibilityButton();
+        }
+
+        function toggleTimeFormat() {
+            is24Hour = !is24Hour;
+            saveTimeFormatPreference();
+            updateTimeFormatButton();
+            setDate();
         }
 
         function toggleFullscreen() {
@@ -410,6 +479,7 @@
             setDate();
             
             toggleClockBtn.innerHTML = icons.digital;
+            updateTimeFormatButton();
             updateDateVisibilityButton();
             fullscreenBtn.innerHTML = icons.fullscreenEnter;
             toggleModeBtn.innerHTML = icons.sun;
@@ -419,6 +489,7 @@
             digitalClock.style.display = 'none';
 
             toggleClockBtn.addEventListener('click', toggleClocks);
+            toggleFormatBtn.addEventListener('click', toggleTimeFormat);
             toggleDateBtn.addEventListener('click', toggleDateVisibility);
             fullscreenBtn.addEventListener('click', toggleFullscreen);
             toggleModeBtn.addEventListener('click', toggleMode);
