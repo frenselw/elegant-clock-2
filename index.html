@@ -91,7 +91,16 @@
             color: var(--text-light);
         }
 
-        .date-display {
+        .info-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5vmin;
+        }
+
+        .date-display,
+        .zone-display {
             padding: 0.9em 1.4em;
             border-radius: 999px;
             background: var(--btn-bg-dark);
@@ -108,7 +117,8 @@
             transition: color 0.5s, background-color 0.5s, border-color 0.5s;
         }
 
-        body.light-mode .date-display {
+        body.light-mode .date-display,
+        body.light-mode .zone-display {
             background: var(--btn-bg-light);
             border: 1px solid rgba(0, 0, 0, 0.05);
             color: var(--text-light);
@@ -277,6 +287,89 @@
             color: var(--second-hand-light);
         }
 
+        button svg.stroke-icon {
+            fill: none;
+            stroke: var(--btn-icon-dark);
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            transition: stroke 0.3s;
+        }
+
+        body.light-mode button svg.stroke-icon {
+            stroke: var(--btn-icon-light);
+        }
+
+        .region-modal-content {
+            max-width: 620px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-hint {
+            margin: 0.4em 0 0;
+            font-size: 0.85rem;
+            opacity: 0.75;
+        }
+
+        .region-list {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+            gap: 10px;
+            margin-top: 18px;
+            padding: 2px;
+            overflow-y: auto;
+        }
+
+        .region-option {
+            width: auto;
+            height: auto;
+            min-height: 54px;
+            border-radius: 12px;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 3px;
+            padding: 8px 12px;
+            color: var(--text-dark);
+            text-align: left;
+        }
+
+        .region-option:hover {
+            transform: none;
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .region-option[aria-pressed="true"] {
+            box-shadow: inset 0 0 0 2px var(--second-hand-dark);
+        }
+
+        .region-option-name {
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .region-option-offset {
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            opacity: 0.72;
+        }
+
+        body.light-mode .region-option {
+            color: var(--text-light);
+        }
+
+        body.light-mode .region-option:hover {
+            background: rgba(0, 0, 0, 0.12);
+        }
+
+        body.light-mode .region-option[aria-pressed="true"] {
+            box-shadow: inset 0 0 0 2px var(--second-hand-light);
+        }
+
     </style>
 </head>
 <body>
@@ -288,13 +381,17 @@
             <div class="hand second-hand"></div>
         </div>
         <div class="clock digital-clock"></div>
-        <div class="date-display" aria-live="polite"></div>
+        <div class="info-row" aria-live="polite">
+            <div class="date-display"></div>
+            <div class="zone-display"></div>
+        </div>
     </div>
 
     <div class="controls">
         <button id="toggleClockBtn" title="Toggle Clock"></button>
         <button id="toggleFormatBtn" class="format-toggle-btn" type="button"></button>
         <button id="toggleDateBtn" title="Hide Date"></button>
+        <button id="toggleZoneBtn" type="button" title="Select Region"></button>
         <button id="fullscreenBtn" title="Toggle Fullscreen"></button>
         <button id="toggleModeBtn" title="Toggle Theme"></button>
         <button id="aboutBtn" title="About"></button>
@@ -311,6 +408,14 @@
         </div>
     </div>
 
+    <div id="regionModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="regionModalTitle">
+        <div class="modal-content region-modal-content">
+            <h2 id="regionModalTitle">Select Region</h2>
+            <p class="modal-hint">Clock, digits and date all follow the chosen region.</p>
+            <div class="region-list" id="regionList"></div>
+        </div>
+    </div>
+
 
     <script>
         /*
@@ -320,6 +425,7 @@
         const digitalClock = document.querySelector('.digital-clock');
         const analogClock = document.querySelector('.analog-clock');
         const dateDisplay = document.querySelector('.date-display');
+        const zoneDisplay = document.querySelector('.zone-display');
         const hourHand = document.querySelector('.hour-hand');
         const minuteHand = document.querySelector('.minute-hand');
         const secondHand = document.querySelector('.second-hand');
@@ -327,19 +433,20 @@
         const toggleClockBtn = document.getElementById('toggleClockBtn');
         const toggleFormatBtn = document.getElementById('toggleFormatBtn');
         const toggleDateBtn = document.getElementById('toggleDateBtn');
+        const toggleZoneBtn = document.getElementById('toggleZoneBtn');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const toggleModeBtn = document.getElementById('toggleModeBtn');
         const aboutBtn = document.getElementById('aboutBtn');
         const aboutModal = document.getElementById('aboutModal');
+        const regionModal = document.getElementById('regionModal');
+        const regionList = document.getElementById('regionList');
         const timeFormatStorageKey = 'elegant-clock-time-format';
+        const zoneStorageKey = 'elegant-clock-time-zone';
+        const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-        const dateFormatter = new Intl.DateTimeFormat(navigator.language, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-
+        let dateFormatter = null;
+        let wallClockFormatter = null;
+        let selectedRegion = loadRegionPreference();
         let isAnalog = true;
         let isDateVisible = true;
         let is24Hour = loadTimeFormatPreference();
@@ -353,8 +460,59 @@
             fullscreenExit: `<svg viewBox="0 0 24 24"><path d="M3 9h2V5h4V3H3zm16 0h2V5h-4V3h6v6zM9 21h2v-4h4v-2H9zm12-6h-2v4h-4v2h6z"></path></svg>`,
             sun: `<svg viewBox="0 0 24 24"><path d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10S2 17.514 2 12 6.486 2 12 2zM4 12c0 1.846.634 3.543 1.688 4.898l8.414-8.414A7.962 7.962 0 0 0 12 4c-4.411 0-8 3.589-8 8zm8 8c1.846 0 3.543-.634 4.898-1.688l-8.414-8.414A7.962 7.962 0 0 0 4 12c0 4.411 3.589 8 8 8z"></path></svg>`,
             moon: `<svg viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-18A10 10 0 1 0 22 12 10 10 0 0 0 12 2z"></path></svg>`,
+            globe: `<svg class="stroke-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><ellipse cx="12" cy="12" rx="4" ry="9"></ellipse><path d="M3 12h18"></path><path d="M5.5 7.5h13M5.5 16.5h13"></path></svg>`,
             info: `<svg viewBox="0 0 24 24"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M11 11h2v6h-2zm0-4h2v2h-2z"></path></svg>`
         };
+
+        const regions = [
+            { id: 'system', name: 'System' },
+            { id: 'Pacific/Honolulu', name: 'Honolulu' },
+            { id: 'America/Anchorage', name: 'Anchorage' },
+            { id: 'America/Los_Angeles', name: 'Los Angeles' },
+            { id: 'America/Denver', name: 'Denver' },
+            { id: 'America/Chicago', name: 'Chicago' },
+            { id: 'America/New_York', name: 'New York' },
+            { id: 'America/Mexico_City', name: 'Mexico City' },
+            { id: 'America/Sao_Paulo', name: 'São Paulo' },
+            { id: 'UTC', name: 'UTC' },
+            { id: 'Europe/London', name: 'London' },
+            { id: 'Europe/Dublin', name: 'Dublin' },
+            { id: 'Europe/Lisbon', name: 'Lisbon' },
+            { id: 'Europe/Madrid', name: 'Madrid' },
+            { id: 'Europe/Paris', name: 'Paris' },
+            { id: 'Europe/Berlin', name: 'Berlin' },
+            { id: 'Europe/Rome', name: 'Rome' },
+            { id: 'Europe/Amsterdam', name: 'Amsterdam' },
+            { id: 'Europe/Stockholm', name: 'Stockholm' },
+            { id: 'Europe/Prague', name: 'Prague' },
+            { id: 'Europe/Warsaw', name: 'Warsaw' },
+            { id: 'Europe/Athens', name: 'Athens' },
+            { id: 'Europe/Istanbul', name: 'Istanbul' },
+            { id: 'Europe/Moscow', name: 'Moscow' },
+            { id: 'Africa/Lagos', name: 'Lagos' },
+            { id: 'Africa/Cairo', name: 'Cairo' },
+            { id: 'Africa/Johannesburg', name: 'Johannesburg' },
+            { id: 'Asia/Jerusalem', name: 'Jerusalem' },
+            { id: 'Asia/Dubai', name: 'Dubai' },
+            { id: 'Asia/Karachi', name: 'Karachi' },
+            { id: 'Asia/Kolkata', name: 'Kolkata' },
+            { id: 'Asia/Kathmandu', name: 'Kathmandu' },
+            { id: 'Asia/Dhaka', name: 'Dhaka' },
+            { id: 'Asia/Bangkok', name: 'Bangkok' },
+            { id: 'Asia/Jakarta', name: 'Jakarta' },
+            { id: 'Asia/Shanghai', name: 'Shanghai' },
+            { id: 'Asia/Hong_Kong', name: 'Hong Kong' },
+            { id: 'Asia/Taipei', name: 'Taipei' },
+            { id: 'Asia/Singapore', name: 'Singapore' },
+            { id: 'Asia/Kuala_Lumpur', name: 'Kuala Lumpur' },
+            { id: 'Asia/Manila', name: 'Manila' },
+            { id: 'Asia/Seoul', name: 'Seoul' },
+            { id: 'Asia/Tokyo', name: 'Tokyo' },
+            { id: 'Australia/Perth', name: 'Perth' },
+            { id: 'Australia/Sydney', name: 'Sydney' },
+            { id: 'Australia/Brisbane', name: 'Brisbane' },
+            { id: 'Pacific/Auckland', name: 'Auckland' }
+        ];
 
         function loadTimeFormatPreference() {
             try {
@@ -372,19 +530,116 @@
             }
         }
 
-        function formatDigitalTime(now) {
+        function isValidTimeZone(timeZone) {
+            try {
+                new Intl.DateTimeFormat('en-US', { timeZone });
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        function loadRegionPreference() {
+            try {
+                const saved = localStorage.getItem(zoneStorageKey);
+                return saved && saved !== 'system' && isValidTimeZone(saved) ? saved : 'system';
+            } catch {
+                return 'system';
+            }
+        }
+
+        function saveRegionPreference() {
+            try {
+                localStorage.setItem(zoneStorageKey, selectedRegion);
+            } catch {
+                // Ignore storage failures and fall back to in-memory state.
+            }
+        }
+
+        function activeTimeZone() {
+            return selectedRegion === 'system' ? systemTimeZone : selectedRegion;
+        }
+
+        function regionDisplayName() {
+            if (selectedRegion !== 'system') {
+                const match = regions.find(region => region.id === selectedRegion);
+                return match ? match.name : selectedRegion;
+            }
+            return systemRegionName();
+        }
+
+        function createWallClockFormatter(timeZone) {
+            return new Intl.DateTimeFormat('en-US', {
+                timeZone,
+                hourCycle: 'h23',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function zoneOffsetMs(now, formatter) {
+            const parts = {};
+            formatter.formatToParts(now).forEach(({ type, value }) => {
+                if (type !== 'literal') parts[type] = value;
+            });
+            const wallClockAsUTC = Date.UTC(
+                Number(parts.year),
+                Number(parts.month) - 1,
+                Number(parts.day),
+                Number(parts.hour),
+                Number(parts.minute),
+                Number(parts.second)
+            );
+            return wallClockAsUTC - (now.getTime() - now.getMilliseconds());
+        }
+
+        function wallClock(now, offsetMs) {
+            const shifted = new Date(now.getTime() + offsetMs);
+            return {
+                hours: shifted.getUTCHours(),
+                minutes: shifted.getUTCMinutes(),
+                seconds: shifted.getUTCSeconds()
+            };
+        }
+
+        function formatUtcOffset(offsetMs) {
+            const totalMinutes = Math.round(offsetMs / 60000);
+            const sign = totalMinutes < 0 ? '-' : '+';
+            const absolute = Math.abs(totalMinutes);
+            const hours = Math.floor(absolute / 60);
+            const minutes = absolute % 60;
+            return minutes
+                ? `UTC${sign}${hours}:${String(minutes).padStart(2, '0')}`
+                : `UTC${sign}${hours}`;
+        }
+
+        function applyRegion() {
+            const timeZone = activeTimeZone();
+            wallClockFormatter = createWallClockFormatter(timeZone);
+            dateFormatter = new Intl.DateTimeFormat(navigator.language, {
+                timeZone,
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function formatDigitalTime(clock) {
+            const minutes = String(clock.minutes).padStart(2, '0');
+            const seconds = String(clock.seconds).padStart(2, '0');
+
             if (is24Hour) {
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const hours = String(clock.hours).padStart(2, '0');
                 return `${hours}:${minutes}:${seconds}`;
             }
 
-            const hours = now.getHours();
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const meridiem = hours >= 12 ? 'PM' : 'AM';
-            const displayHour = hours % 12 || 12;
+            const meridiem = clock.hours >= 12 ? 'PM' : 'AM';
+            const displayHour = clock.hours % 12 || 12;
 
             return `${displayHour}:${minutes}:${seconds} ${meridiem}`;
         }
@@ -404,19 +659,19 @@
         
         function setDate() {
             const now = new Date();
-            const seconds = now.getSeconds();
-            const minutes = now.getMinutes();
-            const hours = now.getHours();
+            const offsetMs = zoneOffsetMs(now, wallClockFormatter);
+            const clock = wallClock(now, offsetMs);
 
-            const secondsDegrees = (seconds / 60) * 360;
+            const secondsDegrees = (clock.seconds / 60) * 360;
             secondHand.style.transform = `rotate(${secondsDegrees}deg)`;
-            const minutesDegrees = (minutes / 60) * 360 + (seconds/60)*6;
+            const minutesDegrees = (clock.minutes / 60) * 360 + (clock.seconds/60)*6;
             minuteHand.style.transform = `rotate(${minutesDegrees}deg)`;
-            const hoursDegrees = (hours / 12) * 360 + (minutes/60)*30;
+            const hoursDegrees = (clock.hours / 12) * 360 + (clock.minutes/60)*30;
             hourHand.style.transform = `rotate(${hoursDegrees}deg)`;
 
-            digitalClock.textContent = formatDigitalTime(now);
+            digitalClock.textContent = formatDigitalTime(clock);
             dateDisplay.textContent = dateFormatter.format(now);
+            zoneDisplay.textContent = `${regionDisplayName()} · ${formatUtcOffset(offsetMs)}`;
         }
 
         function toggleClocks() {
@@ -443,6 +698,72 @@
             saveTimeFormatPreference();
             updateTimeFormatButton();
             setDate();
+        }
+
+        function systemRegionName() {
+            return systemTimeZone.split('/').pop().replace(/_/g, ' ');
+        }
+
+        function availableRegions() {
+            return regions.filter(region => region.id === 'system' || isValidTimeZone(region.id));
+        }
+
+        function renderRegionList() {
+            const now = new Date();
+            const entries = availableRegions()
+                .map(region => ({
+                    region,
+                    offsetMs: zoneOffsetMs(
+                        now,
+                        createWallClockFormatter(region.id === 'system' ? systemTimeZone : region.id)
+                    )
+                }))
+                .sort((a, b) => a.offsetMs - b.offsetMs);
+
+            regionList.textContent = '';
+
+            entries.forEach(({ region, offsetMs }) => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'region-option';
+                option.setAttribute('aria-pressed', String(region.id === selectedRegion));
+
+                const name = document.createElement('span');
+                name.className = 'region-option-name';
+                name.textContent = region.id === 'system' ? `System (${systemRegionName()})` : region.name;
+
+                const offset = document.createElement('span');
+                offset.className = 'region-option-offset';
+                offset.textContent = formatUtcOffset(offsetMs);
+
+                option.append(name, offset);
+                option.addEventListener('click', () => selectRegion(region.id));
+                regionList.appendChild(option);
+            });
+        }
+
+        function openRegionModal() {
+            renderRegionList();
+            regionModal.style.display = 'flex';
+        }
+
+        function closeRegionModal() {
+            regionModal.style.display = 'none';
+        }
+
+        function updateRegionButton() {
+            const label = `Select region. Current region: ${regionDisplayName()}`;
+            toggleZoneBtn.title = label;
+            toggleZoneBtn.setAttribute('aria-label', label);
+        }
+
+        function selectRegion(id) {
+            selectedRegion = id;
+            saveRegionPreference();
+            applyRegion();
+            setDate();
+            updateRegionButton();
+            closeRegionModal();
         }
 
         function toggleFullscreen() {
@@ -482,10 +803,13 @@
 
         function init() {
             createClockFace();
+            applyRegion();
             setInterval(setDate, 1000);
             setDate();
             
             toggleClockBtn.innerHTML = icons.digital;
+            toggleZoneBtn.innerHTML = icons.globe;
+            updateRegionButton();
             updateTimeFormatButton();
             updateDateVisibilityButton();
             fullscreenBtn.innerHTML = icons.fullscreenEnter;
@@ -505,6 +829,18 @@
             aboutModal.addEventListener('click', (e) => {
                 if (e.target === aboutModal) {
                     aboutModal.style.display = 'none';
+                }
+            });
+
+            toggleZoneBtn.addEventListener('click', openRegionModal);
+            regionModal.addEventListener('click', (e) => {
+                if (e.target === regionModal) {
+                    closeRegionModal();
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeRegionModal();
                 }
             });
         }
